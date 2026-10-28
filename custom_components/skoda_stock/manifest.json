@@ -1,0 +1,14 @@
+{
+  "domain": "skoda_stock",
+  "name": "Škoda Stock",
+  "codeowners": [],
+  "config_flow": true,
+  "dependencies": ["http", "frontend", "websocket_api"],
+  "documentation": "https://github.com/CHANGE_ME/skoda_stock",
+  "integration_type": "service",
+  "iot_class": "cloud_polling",
+  "issue_tracker": "https://github.com/CHANGE_ME/skoda_stock/issues",
+  "requirements": [],
+  "single_config_entry": true,
+  "version": "1.0.0"
+}

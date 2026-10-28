@@ -1,0 +1,71 @@
+blueprint:
+  name: Škoda Stock – upozornenia
+  description: Pošle notifikáciu pri novej ponuke, znížení ceny, rezervácii alebo zmiznutí auta.
+  domain: automation
+  input:
+    notify_service:
+      name: Notifikačná služba
+      description: Napr. notify.mobile_app_telefon
+      selector:
+        text:
+    on_new:
+      name: Nové ponuky
+      default: true
+      selector:
+        boolean:
+    on_drop:
+      name: Zníženie ceny
+      default: true
+      selector:
+        boolean:
+    on_rise:
+      name: Zvýšenie ceny
+      default: false
+      selector:
+        boolean:
+    on_reserved:
+      name: Rezervácia / zrušenie rezervácie
+      default: true
+      selector:
+        boolean:
+    on_removed:
+      name: Auto zmizlo z ponuky
+      default: true
+      selector:
+        boolean:
+mode: queued
+max: 20
+variables:
+  notify_service: !input notify_service
+  on_new: !input on_new
+  on_drop: !input on_drop
+  on_rise: !input on_rise
+  on_reserved: !input on_reserved
+  on_removed: !input on_removed
+triggers:
+  - trigger: event
+    event_type:
+      - skoda_stock_new_car
+      - skoda_stock_price_drop
+      - skoda_stock_price_increase
+      - skoda_stock_reserved
+      - skoda_stock_unreserved
+      - skoda_stock_car_removed
+conditions:
+  - condition: template
+    value_template: >
+      {% set t = trigger.event.event_type %}
+      {{ (t == 'skoda_stock_new_car' and on_new)
+         or (t == 'skoda_stock_price_drop' and on_drop)
+         or (t == 'skoda_stock_price_increase' and on_rise)
+         or (t in ['skoda_stock_reserved', 'skoda_stock_unreserved'] and on_reserved)
+         or (t == 'skoda_stock_car_removed' and on_removed) }}
+actions:
+  - action: "{{ notify_service }}"
+    data:
+      title: "{{ trigger.event.data.title }}"
+      message: "{{ trigger.event.data.message }}"
+      data:
+        url: "{{ trigger.event.data.url }}"
+        clickAction: "{{ trigger.event.data.url }}"
+        image: "{{ trigger.event.data.image }}"

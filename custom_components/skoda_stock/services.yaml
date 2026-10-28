@@ -1,0 +1,19 @@
+refresh:
+  name: Obnoviť ponuku
+  description: Okamžite načíta stock zo Škody (najviac raz za 10 minút).
+add_favorite:
+  name: Pridať medzi obľúbené
+  fields:
+    vin:
+      name: VIN
+      required: true
+      selector:
+        text:
+remove_favorite:
+  name: Odstrániť z obľúbených
+  fields:
+    vin:
+      name: VIN
+      required: true
+      selector:
+        text:

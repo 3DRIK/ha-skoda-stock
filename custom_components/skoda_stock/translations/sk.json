@@ -1,0 +1,40 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Škoda Stock",
+        "description": "Sledovanie skladových áut Škoda na skoda-auto.sk",
+        "data": {
+          "models": "Modely (kódy)",
+          "interval_hours": "Interval kontroly (hodiny)",
+          "max_price": "Upozorňovať len do ceny (0 = bez limitu)",
+          "max_km": "Upozorňovať len do nájazdu (0 = bez limitu)",
+          "include_demo": "Upozorňovať aj na predvádzacie autá",
+          "link_template": "Šablóna odkazu na auto (nepovinné)"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Nepodarilo sa načítať dáta zo skoda-auto.sk",
+      "no_models": "Vyber aspoň jeden model"
+    },
+    "abort": {
+      "single_instance_allowed": "Už je nastavené."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Škoda Stock",
+        "data": {
+          "models": "Modely (kódy)",
+          "interval_hours": "Interval kontroly (hodiny)",
+          "max_price": "Upozorňovať len do ceny (0 = bez limitu)",
+          "max_km": "Upozorňovať len do nájazdu (0 = bez limitu)",
+          "include_demo": "Upozorňovať aj na predvádzacie autá",
+          "link_template": "Šablóna odkazu na auto (nepovinné)"
+        }
+      }
+    }
+  }
+}

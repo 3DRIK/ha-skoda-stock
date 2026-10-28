@@ -1,0 +1,40 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Škoda Stock",
+        "description": "Track Škoda stock cars on skoda-auto.sk",
+        "data": {
+          "models": "Models (codes)",
+          "interval_hours": "Check interval (hours)",
+          "max_price": "Alert only up to price (0 = no limit)",
+          "max_km": "Alert only up to mileage (0 = no limit)",
+          "include_demo": "Alert on demo cars too",
+          "link_template": "Car link template (optional)"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Could not load data from skoda-auto.sk",
+      "no_models": "Select at least one model"
+    },
+    "abort": {
+      "single_instance_allowed": "Already configured."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Škoda Stock",
+        "data": {
+          "models": "Models (codes)",
+          "interval_hours": "Check interval (hours)",
+          "max_price": "Alert only up to price (0 = no limit)",
+          "max_km": "Alert only up to mileage (0 = no limit)",
+          "include_demo": "Alert on demo cars too",
+          "link_template": "Car link template (optional)"
+        }
+      }
+    }
+  }
+}
