@@ -1,6 +1,6 @@
 """Constants for Škoda Stock."""
 DOMAIN = "skoda_stock"
-VERSION = "1.0.0"
+VERSION = "1.0.1"
 
 CONF_MODELS = "models"
 CONF_INTERVAL_HOURS = "interval_hours"
