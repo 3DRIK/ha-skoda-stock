@@ -13,7 +13,7 @@ HISTORY_MAX = 60
 
 
 def new_db() -> dict:
-    return {"initialized": False, "cars": {}, "favorites": []}
+    return {"initialized": False, "cars": {}, "favorites": [], "catalog": {}}
 
 
 def fmt_eur(v: float | None) -> str:
@@ -184,6 +184,9 @@ def car_view(vin: str, rec: dict, favs: set, link_fn: Callable[[dict], str]) -> 
         "reserved_since": rec.get("reserved_since"),
         "price_prev": prev, "price_changed_at": changed_at,
         "price_history": rec.get("price_history") or [],
+        "packages": (rec.get("equipment") or {}).get("packages"),
+        "ft": (rec.get("equipment") or {}).get("features"),
+        "tech": (rec.get("equipment") or {}).get("tech"),
     }
 
 
@@ -240,3 +243,104 @@ def compute_stats(db: dict, now: datetime, link_fn: Callable[[dict], str]) -> di
         "favorites_changed": fav_changed,
         "updated_at": now,
     }
+
+
+# ---------------------------------------------------------------- equipment
+TECH_KEYS = (
+    "ElectricCarBatteryCapacity", "MaximumDcChargingPower", "BatteryChargingTime80_SOC_Max_DC",
+    "BatteryChargingTimeAC11_100_SOC", "Acceleration", "MaxSpeed", "LuggageCapacity",
+    "TowingWeightBraked12", "Payload.WithDriver",
+)
+
+
+def _clean(text: Any) -> str:
+    return " ".join(str(text or "").split())
+
+
+def _feature_id(item: dict) -> str | None:
+    """Option code if present (unique per option), else family+text (standard equipment)."""
+    code = _clean(item.get("keytoolCode"))
+    if code:
+        return code
+    fam, text = _clean(item.get("family")), _clean(item.get("text"))
+    return f"{fam}:{text}" if (fam or text) else None
+
+
+def parse_equipment(data: Any) -> tuple[dict, dict] | None:
+    """getCarDetail response -> (equipment, catalog) or None if it has no equipment."""
+    if isinstance(data, dict) and isinstance(data.get("results"), dict):
+        data = data["results"]
+    groups = data.get("equipmentGroups") if isinstance(data, dict) else None
+    if not isinstance(groups, list) or not groups:
+        return None
+
+    catalog: dict[str, dict] = {}
+    features: list[str] = []
+    seen: set[str] = set()
+    packages: list[dict] = []
+    tech: dict[str, str] = {}
+
+    def add(item: dict, group: str) -> str | None:
+        fid, text = _feature_id(item), _clean(item.get("text"))
+        if not fid or not text:
+            return None
+        catalog.setdefault(fid, {"t": text, "g": group})
+        return fid
+
+    def keep(fid: str | None) -> None:
+        if fid and fid not in seen:
+            seen.add(fid)
+            features.append(fid)
+
+    for g in groups:
+        gid = g.get("id")
+        if gid == "packages":
+            for sec in g.get("sections") or []:
+                ids = [x for x in (add(i, "Balíky") for i in sec.get("items") or []) if x]
+                packages.append({"t": _clean(sec.get("title")) or "Balík", "f": ids})
+            continue
+        if gid == "tech_equip":
+            for sec in g.get("sections") or []:
+                for it in sec.get("items") or []:
+                    if it.get("key") in TECH_KEYS and it.get("text"):
+                        tech[it["key"]] = _clean(it["text"])
+            continue
+        group = _clean(g.get("name"))
+        for it in (g.get("items") or []) + (g.get("itemsSpecial") or []):
+            keep(add(it, group))
+    for pkg in packages:
+        for fid in pkg["f"]:
+            keep(fid)
+    return {"packages": packages, "features": features, "tech": tech}, catalog
+
+
+def merge_equipment(db: dict, vin: str, equipment: dict, catalog: dict, now: str) -> None:
+    db.setdefault("catalog", {})
+    for fid, meta in catalog.items():
+        db["catalog"].setdefault(fid, meta)
+    rec = db["cars"][vin]
+    rec["equipment"] = equipment
+    rec["equip_at"] = now
+
+
+def missing_equipment(db: dict, now: str, retry_hours: float, limit: int | None = None) -> list[str]:
+    """Active cars without equipment whose last attempt is absent or old enough."""
+    cutoff = _ts(now) - timedelta(hours=retry_hours)  # type: ignore[operator]
+    out = []
+    for vin, rec in sorted(db["cars"].items(), key=lambda kv: kv[1]["car"].get("order", 0)):
+        if rec.get("removed_at") or rec.get("equipment"):
+            continue
+        last = _ts(rec.get("equip_attempt"))
+        if last is None or last < cutoff:
+            out.append(vin)
+    return out[:limit] if limit else out
+
+
+def used_catalog(db: dict) -> dict:
+    ids: set[str] = set()
+    for rec in db["cars"].values():
+        eq = rec.get("equipment")
+        if eq and not rec.get("removed_at"):
+            ids.update(eq["features"])
+    cat = db.get("catalog", {})
+    return {i: cat[i] for i in ids if i in cat}

@@ -22,6 +22,18 @@ filtrovaný na model. Nájdi si na webe detail ľubovoľného auta, skopíruj je
 identifikátora zástupným symbolom: `{key}`, `{id}`, `{vin}`, `{commission}` alebo `{model_code}`.
 Príklad: `https://www.skoda-auto.sk/.../detail/{key}`. Odkaz na web predajcu je v dátach vždy (`dealer_website`).
 
+## Výbava a balíky
+Pri každom novom aute sa raz načíta detail (`getCarDetail?id=...`) a uloží sa výbava, balíky a pár technických
+údajov (čistá kapacita batérie, DC nabíjanie, zrýchlenie, batožinový priestor). Pri novej ponuke sa detail načíta ešte
+pred upozornením, takže správa obsahuje názvy balíkov. Ostatné autá sa doťahujú na pozadí po jednom s pauzou 1,5 s
+(prvé načítanie ~200 áut trvá zhruba 5 minút). Neúspešný pokus sa opakuje najskôr o 6 hodín alebo službou
+`skoda_stock.fetch_equipment`.
+
+V karte je panel *Výbava a balíky*: zaškrtni balíky alebo jednotlivé položky, vyhľadávať sa dá v texte
+(napr. „tepelné čerpadlo"). Režim *Musí mať všetko* / *Stačí aspoň jedno* sa objaví pri viac ako jednom výbere.
+Autá, ktorým výbava ešte nebola načítaná, sa pri aktívnom filtri výbavy skryjú (karta to napíše pri počte áut).
+Balíky sa berú zo skupiny `packages` v odpovedi, ostatná výbava zo zvyšných skupín.
+
 ## Entity
 Počet áut, Najlacnejšie auto, Nové ponuky za 24 h, Zníženia cien za 24 h, Rezervované autá, Predvádzacie autá,
 Obľúbené autá, Posledná aktualizácia a binárny senzor *Zmena u obľúbených* (cena / rezervácia / zmiznutie za 24 h).

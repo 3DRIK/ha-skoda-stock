@@ -5,8 +5,11 @@ const eur = (n) => (n == null ? "–" : new Intl.NumberFormat("sk-SK", { style: 
 const day = (s) => (s ? new Date(s).toLocaleDateString("sk-SK", { day: "numeric", month: "numeric", year: "numeric" }) : "");
 const DAY = 864e5;
 const LS = "skoda-stock-card-filters";
-const DEFAULTS = { q: "", model: "all", fav: false, fresh: false, drop: false, hideRes: false, demo: "all", maxPrice: "", sort: "offer" };
+const DEFAULTS = { q: "", model: "all", fav: false, fresh: false, drop: false, hideRes: false, demo: "all", maxPrice: "", sort: "offer", pk: [], ft: [], eqMode: "all" };
 const SORTS = { offer: "Najnovšie ponuky", price_asc: "Cena od najnižšej", price_desc: "Cena od najvyššej", discount: "Najväčšia zľava", km: "Najmenej km", range: "Najväčší dojazd" };
+const TECH = { ElectricCarBatteryCapacity: "Čistá kapacita batérie", MaximumDcChargingPower: "Max. DC nabíjanie", BatteryChargingTime80_SOC_Max_DC: "Nabíjanie na 80 % (DC)",
+  BatteryChargingTimeAC11_100_SOC: "Nabíjanie AC 11 kW na 100 %", Acceleration: "Zrýchlenie 0–100 km/h", MaxSpeed: "Max. rýchlosť", LuggageCapacity: "Batožinový priestor",
+  TowingWeightBraked12: "Ťažné zariadenie (brzdené)", "Payload.WithDriver": "Užitočná hmotnosť" };
 const DEMO_STEPS = ["all", "only", "none"];
 const DEMO_LABEL = { all: "Nové aj predvádzacie", only: "Iba predvádzacie", none: "Bez predvádzacích" };
 
@@ -55,6 +58,14 @@ select option { color:#111 }
 .det span { color:#8b93a7 } .det a { color:#60a5fa }
 .spark { grid-column:1/-1 }
 .more, .empty { width:100%; padding:12px; border-radius:12px; border:1px dashed rgba(255,255,255,.2); background:none; text-align:center; color:#8b93a7 }
+details.eq { background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.08); border-radius:12px; padding:8px 12px }
+details.eq summary { cursor:pointer; font-weight:600 }
+.eqbox { display:grid; gap:10px; margin-top:10px }
+#eqopts { max-height:260px; overflow:auto; display:grid; gap:2px }
+.opt { display:flex; align-items:center; gap:8px; padding:4px 2px; font-size:.9rem }
+.opt span { flex:1; min-width:0 } .opt em { color:#8b93a7; font-style:normal; font-size:.8rem }
+.grp { color:#8b93a7; font-size:.8rem; margin-top:6px }
+.tag.pk { background:rgba(96,165,250,.12); color:#bfdbfe }
 @media (max-width:480px) { .top { flex-wrap:wrap } .price { text-align:left; width:100% } }
 `;
 
@@ -87,6 +98,9 @@ class SkodaStockCard extends HTMLElement {
     try {
       this._data = await this._hass.callWS({ type: "skoda_stock/list" });
       for (const c of this._data.cars) c._s = fold([c.model, c.title, c.dealer_name, c.dealer_city, c.color, c.interior, c.vin, c.commission].join(" "));
+        c._has = Array.isArray(c.ft);
+        c._ft = new Set(c.ft || []);
+        c._pk = new Set((c.packages || []).map((p) => p.t));
       this._err = null;
     } catch (e) {
       this._err = "Integrácia Škoda Stock nie je načítaná. Pridaj ju v Nastavenia → Zariadenia a služby.";
@@ -103,6 +117,10 @@ class SkodaStockCard extends HTMLElement {
       <div class="filters">
         <input id="q" type="search" placeholder="Hľadať verziu, predajcu, mesto, farbu alebo VIN" aria-label="Hľadať">
         <div class="chips" id="chips"></div>
+        <details class="eq" id="eq"><summary>Výbava a balíky <span id="eqn"></span></summary>
+          <div class="eqbox"><input id="eqq" type="search" placeholder="Hľadať výbavu, napr. tepelné čerpadlo" aria-label="Hľadať výbavu">
+            <div id="eqopts"></div></div></details>
+        <div class="chips" id="eqsel"></div>
         <div class="row"><select id="sort" aria-label="Zoradenie"></select>
           <label>Cena do <input id="maxp" type="number" step="500" min="0" inputmode="numeric"></label></div>
       </div><div id="list"></div></ha-card>`;
@@ -126,9 +144,25 @@ class SkodaStockCard extends HTMLElement {
       this._changed();
     });
     $("list").addEventListener("click", (e) => this._onList(e));
+    $("eqq").addEventListener("input", () => this._renderEq());
+    $("eqopts").addEventListener("change", (e) => {
+      const i = e.target.closest("[data-eq]"); if (!i) return;
+      const arr = this._f[i.dataset.eq], k = arr.indexOf(i.dataset.id);
+      if (i.checked && k < 0) arr.push(i.dataset.id);
+      if (!i.checked && k >= 0) arr.splice(k, 1);
+      this._changed();
+    });
+    $("eqsel").addEventListener("click", (e) => {
+      const b = e.target.closest("[data-eqx]"), m = e.target.closest("[data-eqmode]");
+      if (m) { this._f.eqMode = this._f.eqMode === "all" ? "any" : "all"; this._changed(); return; }
+      if (!b) return;
+      const arr = this._f[b.dataset.eqx], k = arr.indexOf(b.dataset.id);
+      if (k >= 0) arr.splice(k, 1);
+      this._changed(); this._renderEq();
+    });
   }
-  _changed() { this._shown = this._config.page_size; this._save(); this._renderChips(); this._renderList(); }
-  _renderAll() { if (!this._root) return; this._renderChips(); this._renderList(); this._renderSub(); }
+  _changed() { this._shown = this._config.page_size; this._save(); this._renderChips(); this._renderEqSel(); this._renderList(); }
+  _renderAll() { if (!this._root) return; this._buildEq(); this._renderChips(); this._renderEq(); this._renderEqSel(); this._renderList(); this._renderSub(); }
 
   async _onList(e) {
     const more = e.target.closest("[data-more]");
@@ -142,6 +176,37 @@ class SkodaStockCard extends HTMLElement {
     } else if (act === "open") {
       this._open.has(vin) ? this._open.delete(vin) : this._open.add(vin); this._renderList();
     }
+  }
+
+  _buildEq() {
+    if (!this._data) return;
+    const act = this._data.cars.filter((c) => !c.removed_at), pk = new Map(), ft = new Map();
+    for (const c of act) {
+      for (const t of c._pk) pk.set(t, (pk.get(t) || 0) + 1);
+      for (const id of c._ft) ft.set(id, (ft.get(id) || 0) + 1);
+    }
+    this._eq = { pk, ft, total: act.length, missing: act.filter((c) => !c._has).length };
+  }
+  _label(type, id) { return type === "pk" ? id : (this._data?.catalog?.[id]?.t || id); }
+  _renderEq() {
+    const box = this._root.getElementById("eqopts"); if (!box || !this._eq) return;
+    const q = fold(this._root.getElementById("eqq").value.trim()), { pk, ft, total } = this._eq, f = this._f;
+    const opt = (type, id, n) => `<label class="opt"><input type="checkbox" data-eq="${type}" data-id="${esc(id)}" ${f[type].includes(id) ? "checked" : ""}>
+      <span>${esc(this._label(type, id))}</span><em>${n}</em></label>`;
+    const pks = [...pk].filter(([t]) => !q || fold(t).includes(q)).sort((a, b) => b[1] - a[1]).map(([t, n]) => opt("pk", t, n));
+    const all = [...ft].filter(([id, n]) => (q || n < total) && (!q || fold(this._label("ft", id)).includes(q))).sort((a, b) => b[1] - a[1]);
+    const fts = all.slice(0, 60).map(([id, n]) => opt("ft", id, n));
+    box.innerHTML = (pks.length ? `<div class="grp">Balíky</div>${pks.join("")}` : "") +
+      (fts.length ? `<div class="grp">Výbava${all.length > 60 ? ` (prvých 60 z ${all.length}, zúž hľadanie)` : ""}</div>${fts.join("")}` : "") ||
+      `<div class="empty">${this._eq.missing === total ? "Výbava sa ešte načítava." : "Nič sa nenašlo."}</div>`;
+  }
+  _renderEqSel() {
+    const el = this._root.getElementById("eqsel"), n = this._f.pk.length + this._f.ft.length;
+    this._root.getElementById("eqn").textContent = n ? `(vybrané: ${n})` : "";
+    if (!el) return;
+    const chip = (type, id) => `<button class="chip on" data-eqx="${type}" data-id="${esc(id)}" aria-label="Zrušiť filter">${esc(this._label(type, id))} ×</button>`;
+    el.innerHTML = [...this._f.pk.map((x) => chip("pk", x)), ...this._f.ft.map((x) => chip("ft", x))].join("") +
+      (n > 1 ? `<button class="chip" data-eqmode>${this._f.eqMode === "all" ? "Musí mať všetko" : "Stačí aspoň jedno"}</button>` : "");
   }
 
   _isFresh(c) { return !c.baseline && Date.now() - Date.parse(c.first_seen) < 2 * DAY; }
@@ -159,6 +224,8 @@ class SkodaStockCard extends HTMLElement {
     if (f.hideRes) L = L.filter((c) => !c.is_reserved);
     if (f.demo === "only") L = L.filter((c) => c.is_demo);
     if (f.demo === "none") L = L.filter((c) => !c.is_demo);
+    const sel = [...f.pk.map((t) => (c) => c._pk.has(t)), ...f.ft.map((id) => (c) => c._ft.has(id))];
+    if (sel.length) L = L.filter((c) => c._has && (f.eqMode === "any" ? sel.some((fn) => fn(c)) : sel.every((fn) => fn(c))));
     if (maxp) L = L.filter((c) => c.price != null && c.price <= maxp);
     const by = {
       offer: (a, b) => a.order - b.order,
@@ -176,7 +243,8 @@ class SkodaStockCard extends HTMLElement {
     if (this._err || !this._data) { sub.textContent = ""; return; }
     const act = this._data.cars.filter((c) => !c.removed_at).length;
     const upd = this._data.updated_at ? new Date(this._data.updated_at).toLocaleString("sk-SK", { dateStyle: "short", timeStyle: "short" }) : "–";
-    sub.textContent = `${act} áut v ponuke, aktualizované ${upd}`;
+    const miss = this._eq ? this._eq.missing : 0;
+    sub.textContent = `${act} áut v ponuke, aktualizované ${upd}` + (miss ? `, výbava sa načítava pre ${miss} áut` : "");
   }
 
   _renderChips() {
@@ -206,6 +274,7 @@ class SkodaStockCard extends HTMLElement {
       this._isFresh(c) && `<span class="tag new">Nové</span>`,
       this._isDrop(c) && `<span class="tag drop">Zlacnené</span>`,
       c.is_reserved && `<span class="tag res">Rezervované</span>`,
+      ...(c.packages || []).map((p) => `<span class="tag pk">${esc(p.t)}</span>`),
       c.is_demo && `<span class="tag demo">Predvádzacie${c.mileage_km != null ? `, ${c.mileage_km.toLocaleString("sk-SK")} km` : ""}</span>`,
     ].filter(Boolean).join("");
     const det = open ? `<div class="det">
@@ -217,6 +286,9 @@ class SkodaStockCard extends HTMLElement {
       <div><span>Dostupnosť</span><br>${esc(c.available_from === "Immediately" ? "Ihneď" : c.available_from || "–")}</div>
       <div><span>VIN</span><br>${esc(c.vin)}</div>
       <div><span>V ponuke od</span><br>${c.baseline ? "pred sledovaním" : day(c.first_seen)}</div>
+      ${Object.entries(c.tech || {}).map(([k, v]) => `<div><span>${esc(TECH[k] || k)}</span><br>${esc(v)}</div>`).join("")}
+      ${(c.packages || []).map((p) => `<div class="spark"><span>Balík ${esc(p.t)}</span><br>${esc(p.f.map((id) => this._label("ft", id)).join(", "))}</div>`).join("")}
+      ${c.ft ? `<div class="spark"><details><summary><span>Všetka výbava (${c.ft.length})</span></summary>${esc(c.ft.map((id) => this._label("ft", id)).join("; "))}</details></div>` : `<div class="spark"><span>Výbava sa ešte načítava.</span></div>`}
       <div class="spark">${this._spark(c.price_history)}</div></div>` : "";
     return `<div class="car ${c.removed_at ? "gone" : ""}" data-vin="${esc(c.vin)}">
       <button class="star ${c.favorite ? "on" : ""}" data-act="fav" aria-pressed="${!!c.favorite}" aria-label="Obľúbené">${c.favorite ? "★" : "☆"}</button>

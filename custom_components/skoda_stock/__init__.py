@@ -45,7 +45,11 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
     async def remove_favorite(call: ServiceCall) -> None:
         await _coordinator(hass).async_set_favorite(call.data["vin"], False)
 
+    async def fetch_equipment(call: ServiceCall) -> None:
+        await _coordinator(hass).async_fetch_missing_details()
+
     hass.services.async_register(DOMAIN, "refresh", refresh)
+    hass.services.async_register(DOMAIN, "fetch_equipment", fetch_equipment)
     hass.services.async_register(DOMAIN, "add_favorite", add_favorite, schema=FAV_SCHEMA)
     hass.services.async_register(DOMAIN, "remove_favorite", remove_favorite, schema=FAV_SCHEMA)
     return True

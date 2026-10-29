@@ -36,3 +36,8 @@ EVT_RESERVED = "skoda_stock_reserved"
 EVT_UNRESERVED = "skoda_stock_unreserved"
 EVT_REMOVED = "skoda_stock_car_removed"
 EVT_UPDATED = "skoda_stock_updated"
+
+API_DETAIL_URL = "https://www.skoda-auto.sk/apps/stock/654/sk-SK/api/getCarDetail"
+DETAIL_DELAY = 1.5        # seconds between detail requests
+DETAIL_RETRY_HOURS = 6    # retry a failed/empty detail fetch after this long
+DETAIL_NEW_CAP = 15       # new cars whose detail is fetched before their alert is sent

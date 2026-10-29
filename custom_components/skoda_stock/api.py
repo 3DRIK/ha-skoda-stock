@@ -9,7 +9,7 @@ from urllib.parse import quote
 
 import aiohttp
 
-from .const import API_URL, LIST_URL, MAX_PAGES, PAGE_DELAY, USER_AGENT
+from .const import API_DETAIL_URL, API_URL, LIST_URL, MAX_PAGES, PAGE_DELAY, USER_AGENT
 
 _LOGGER = logging.getLogger(__name__)
 HEADERS = {"Accept": "application/json;profile=camelcase", "User-Agent": USER_AGENT}
@@ -114,24 +114,30 @@ def build_link(car: dict, template: str | None) -> str:
     )
 
 
-async def fetch_page(session: aiohttp.ClientSession, models: list[str], page: int) -> dict:
-    params = [("CarType", "N")] + [("Model", m) for m in models] + [
-        ("PageNo", str(page)), ("SortDirection", "1"), ("SortKey", "DATE_OFFER"),
-    ]
+async def _get_json(session: aiohttp.ClientSession, url: str, params: list | dict, what: str) -> dict:
     last_err: Exception | None = None
-    for attempt in range(2):
+    for _ in range(2):
         try:
-            async with session.get(
-                API_URL, params=params, headers=HEADERS,
-                timeout=aiohttp.ClientTimeout(total=30),
-            ) as resp:
+            async with session.get(url, params=params, headers=HEADERS,
+                                   timeout=aiohttp.ClientTimeout(total=30)) as resp:
                 if resp.status != 200:
                     raise SkodaStockError(f"HTTP {resp.status}")
                 return await resp.json(content_type=None)
         except (aiohttp.ClientError, asyncio.TimeoutError, SkodaStockError) as err:
             last_err = err
             await asyncio.sleep(3)
-    raise SkodaStockError(f"page {page}: {last_err}")
+    raise SkodaStockError(f"{what}: {last_err}")
+
+
+async def fetch_page(session: aiohttp.ClientSession, models: list[str], page: int) -> dict:
+    params = [("CarType", "N")] + [("Model", m) for m in models] + [
+        ("PageNo", str(page)), ("SortDirection", "1"), ("SortKey", "DATE_OFFER"),
+    ]
+    return await _get_json(session, API_URL, params, f"page {page}")
+
+
+async def fetch_detail(session: aiohttp.ClientSession, car_id: str) -> dict:
+    return await _get_json(session, API_DETAIL_URL, {"id": car_id}, f"detail {car_id}")
 
 
 async def fetch_all(session: aiohttp.ClientSession, models: list[str]) -> dict[str, dict]:

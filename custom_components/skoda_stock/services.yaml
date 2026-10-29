@@ -1,6 +1,9 @@
 refresh:
   name: Obnoviť ponuku
   description: Okamžite načíta stock zo Škody (najviac raz za 10 minút).
+fetch_equipment:
+  name: Doťahnúť výbavu
+  description: Znovu skúsi načítať výbavu a balíky áut, pre ktoré ešte chýbajú.
 add_favorite:
   name: Pridať medzi obľúbené
   fields:
