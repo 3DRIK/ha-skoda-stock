@@ -97,10 +97,24 @@ class SkodaStockCard extends HTMLElement {
   async _load() {
     try {
       this._data = await this._hass.callWS({ type: "skoda_stock/list" });
-      for (const c of this._data.cars) c._s = fold([c.model, c.title, c.dealer_name, c.dealer_city, c.color, c.interior, c.vin, c.commission].join(" "));
+
+      for (const c of this._data.cars) {
+        c._s = fold([
+          c.model,
+          c.title,
+          c.dealer_name,
+          c.dealer_city,
+          c.color,
+          c.interior,
+          c.vin,
+          c.commission
+        ].join(" "));
+
         c._has = Array.isArray(c.ft);
         c._ft = new Set(c.ft || []);
         c._pk = new Set((c.packages || []).map((p) => p.t));
+      }
+
       this._err = null;
     } catch (e) {
       this._err = "Integrácia Škoda Stock nie je načítaná. Pridaj ju v Nastavenia → Zariadenia a služby.";
